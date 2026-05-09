@@ -29,3 +29,7 @@ This is an engineering project (no `notebooks/`, no ML/research workflow). Sub-a
 - Secrets via `.env` (gitignored); `.env.example` is committed.
 - Plans live at `docs/plans/<branch-slug>.md`.
 - ADRs at `docs/ADR/`, CODEMAPS at `docs/CODEMAPS/` — created via `document-agent` when structural decisions land.
+
+## STATE.md conventions
+
+- **Do not record the active branch in `docs/STATE.md`.** Cloud-runtime sessions create ephemeral branches (`claude/<slug>-<hash>`) that are deleted on merge — recording them in committed docs guarantees staleness within hours. Branch state belongs to git, not to STATE.md. `document-agent` must skip the "Active branch" field when refreshing STATE.md for this project. Other STATE.md fields (project status, in-progress work, next-up, blocked, notes, history) remain.

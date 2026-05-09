@@ -4,7 +4,8 @@ _Last updated: 2026-05-09 00:00_
 
 ## Current
 
-**Active branch:** `claude/setup-project-workflow-hrLJK`
+> ✅ **Merged 2026-05-09:** `42ee10e` — chore: bootstrap project with CLAUDE.md, plan, and STATE.md (PR #3)
+
 **Project status:** Plan phase complete — implementation pending.
 **In progress:** none (plan approved; implementation has not started).
 **Recently shipped:** nothing yet — greenfield repo.
