@@ -53,7 +53,7 @@ intents explicitly; there is no third option of "no bound at all".
   next to the `search_channels` reference so the option is discoverable
   without spelunking through tests.
 - `tests/test_search.py` no longer has a `since=None` happy-path test;
-  it now has `test_search_with_wide_since_window` which exercises the
+  it now has `test_wide_since_window_includes_ancient_messages` which exercises the
   same code path (no real cutoff) by passing a wide window.
 - The verification surface for "the tool actually advertises this as
   required" lives in `tests/test_server_stdio.py::test_full_protocol_exchange_keeps_stdio_clean`,
@@ -83,7 +83,7 @@ intents explicitly; there is no third option of "no bound at all".
 - `src/tg_mcp/tools.py` — `search_channels` signature and docstring.
 - `src/tg_mcp/client.py` — `parse_since` rejects empty input.
 - `README.md` — usage examples and the `"36500d"` escape-hatch note.
-- `tests/test_search.py` — `test_search_with_wide_since_window`.
+- `tests/test_search.py` — `test_wide_since_window_includes_ancient_messages`.
 - `tests/test_server_stdio.py` — `test_full_protocol_exchange_keeps_stdio_clean`
   asserts `since` is in the live JSON schema's `required` list.
 - ADR-0001 (no whitelist) — same family of decisions: the server
