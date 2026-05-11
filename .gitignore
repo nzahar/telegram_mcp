@@ -29,7 +29,6 @@ env/
 
 # Logs
 *.log
-~/.local/state/tg-mcp/
 
 # Test / coverage artefacts
 .pytest_cache/

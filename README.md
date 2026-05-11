@@ -40,16 +40,22 @@ The server authenticates via a Telethon `StringSession`. To produce one, run the
 uv run python scripts/login.py
 ```
 
-You will be prompted for your phone (international format, e.g. `+12025550100`), the code Telegram sends to that number, and — if you have 2FA enabled — your account password. The session string is printed to **stdout**; copy it into `.env` as `TG_SESSION_STRING`.
+You will be prompted for your phone (international format, e.g. `+12025550100`), the code Telegram sends to that number, and — if you have 2FA enabled — your account password.
+
+Two output modes:
 
 ```bash
-uv run python scripts/login.py > /tmp/session.txt
-# inspect /tmp/session.txt and paste into .env, then delete the file
+# default: print session string to stdout (good for one-shot interactive use)
+uv run python scripts/login.py
+
+# recommended: write directly to a file at mode 0600 — avoids leaks through
+# `set -x`, shell history, and CI log capture.
+uv run python scripts/login.py --out /tmp/tg-session.txt
 ```
 
-The script keeps the session in memory only — no `*.session` file is ever written to disk.
+Copy the resulting string into `.env` as `TG_SESSION_STRING`, then delete the temp file. The script keeps the session in memory only — no `*.session` file is ever written to disk.
 
-**The session string is equivalent to your account password.** Anyone holding it can act as your Telegram account, including reading every chat and sending any message. Never commit `.env`. Never paste it into shared chat or pastebins. `.gitignore` already excludes `.env` and `*.session*` files.
+**The session string is equivalent to your account password.** Anyone holding it can act as your Telegram account, including reading every chat and sending any message. Never commit `.env`. Never paste it into shared chat or pastebins. Avoid the default stdout mode in shells with `set -x` or under CI loggers — use `--out` there. `.gitignore` already excludes `.env` and `*.session*` files.
 
 ## Run
 
@@ -105,8 +111,8 @@ All tools return pydantic models that the host serialises as JSON.
 Search for matching messages across multiple channels in a single call.
 
 - `channels: list[str | int]` — channel references. `@username` for public channels, integer chat IDs for private ones already accessible to your account.
+- `since: str` — **required** cutoff. Accepts `Nd` / `Nh` / `Nm` (e.g. `"7d"`, `"24h"`, `"30m"`) or an ISO-8601 date / datetime. Naive ISO is treated as UTC. The parameter is mandatory by design — pass a deliberately wide window (e.g. `"36500d"`) if you really want no cutoff. This prevents callers from accidentally requesting the full history of a channel.
 - `query: str` — full-text query passed to Telegram's search. Pass `""` to fetch recent messages without filtering.
-- `since: str` — required cutoff. Accepts `Nd` / `Nh` / `Nm` (e.g. `"7d"`, `"24h"`, `"30m"`) or an ISO-8601 date / datetime. Naive ISO is treated as UTC.
 - `limit_per_channel: int` — cap per channel, default 50.
 
 Returns `ReadResult(items, partial)` where `items` mixes `Message` and per-channel `ErrorEntry` records. `partial=True` if any channel was abandoned after a second consecutive `FloodWaitError`; previously delivered items from earlier channels are still present.

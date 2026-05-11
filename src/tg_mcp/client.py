@@ -14,7 +14,7 @@ import logging
 import os
 import re
 from datetime import datetime, timedelta, timezone
-from typing import Any, Awaitable, Callable, Optional, Union
+from typing import Any, Awaitable, Callable, Optional
 
 from telethon import TelegramClient
 from telethon.errors import (
@@ -25,8 +25,19 @@ from telethon.errors import (
 )
 from telethon.sessions import StringSession
 
+from .models import ChannelRef
 
-ChannelRef = Union[str, int]
+
+__all__ = [
+    "ChannelRef",
+    "ChannelResolutionError",
+    "FloodLimitExceeded",
+    "get_client",
+    "shutdown",
+    "parse_since",
+    "resolve_channel",
+    "with_flood_retry",
+]
 
 
 class ChannelResolutionError(Exception):
@@ -61,8 +72,12 @@ async def get_client() -> TelegramClient:
     """Return the lazily-initialised, connected Telethon client.
 
     Reads credentials from env on first call. Subsequent calls return the same
-    instance. Raises ``RuntimeError`` if credentials are missing or the
-    session string is not authorised.
+    instance. If the previous singleton is present but disconnected (Telethon
+    dropped the link mid-session), it is explicitly disconnected before a new
+    client replaces it so background sender/keepalive tasks do not leak.
+
+    Raises ``RuntimeError`` if credentials are missing or the session is not
+    authorised.
     """
     global _client
     if _client is not None and _client.is_connected():
@@ -71,6 +86,16 @@ async def get_client() -> TelegramClient:
     async with _client_lock:
         if _client is not None and _client.is_connected():
             return _client
+
+        prev = _client
+        _client = None
+        if prev is not None:
+            try:
+                await prev.disconnect()
+            except Exception:
+                # The old singleton is already dead; don't let cleanup hide
+                # the real reason we're reconnecting.
+                pass
 
         try:
             api_id = int(os.environ["TG_API_ID"])

@@ -68,8 +68,8 @@ async def _collect_channel_messages(
 
 async def search_channels(
     channels: list[ChannelRef],
+    since: str,
     query: str = "",
-    since: Optional[str] = None,
     limit_per_channel: int = 50,
 ) -> ReadResult:
     """Search recent messages across multiple channels.
@@ -78,9 +78,14 @@ async def search_channels(
     entries. ``partial=True`` if any channel was abandoned after a second
     consecutive FloodWaitError. Bad channels are reported as ``ErrorEntry``
     rather than aborting the batch.
+
+    ``since`` is required (``"Nd"``/``"Nh"``/``"Nm"`` or ISO-8601). Use a
+    deliberately wide window (e.g. ``"36500d"``) if you really want no cutoff —
+    we keep the parameter mandatory so callers cannot accidentally request the
+    full history of a channel.
     """
     client = await get_client()
-    since_dt = parse_since(since) if since else None
+    since_dt = parse_since(since)
     items: list = []
     partial = False
     for channel_ref in channels:
@@ -153,7 +158,10 @@ async def get_recent(channel: ChannelRef, limit: int = 30) -> ReadResult:
 
 def _send_link(chat: ChannelRef, first_msg_id: int) -> Optional[str]:
     if isinstance(chat, str) and chat.startswith("@") and len(chat) > 1:
-        return f"https://t.me/{chat[1:]}/{first_msg_id}"
+        # Telegram usernames are case-insensitive; canonicalise to lowercase so
+        # the link matches what `_build_message_link` returns from a resolved
+        # entity (Telethon yields lowercase `entity.username`).
+        return f"https://t.me/{chat[1:].lower()}/{first_msg_id}"
     return None
 
 

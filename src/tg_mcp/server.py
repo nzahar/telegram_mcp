@@ -25,6 +25,24 @@ from .logging_setup import setup_logging
 log = logging.getLogger("tg_mcp.server")
 
 
+def _route_fastmcp_logs_to_file() -> None:
+    """Strip FastMCP's RichHandler and re-enable propagation so its logs flow
+    through our root file handler instead of leaking onto stderr.
+
+    Called at import time so any entry point (``python -m tg_mcp.server``,
+    direct import + ``mcp.run()``, or in-process test harness) inherits the
+    clean configuration without having to remember to go through :func:`main`.
+    """
+    fastmcp_logger = logging.getLogger("fastmcp")
+    for h in list(fastmcp_logger.handlers):
+        fastmcp_logger.removeHandler(h)
+        h.close()
+    fastmcp_logger.propagate = True
+
+
+_route_fastmcp_logs_to_file()
+
+
 @asynccontextmanager
 async def _lifespan(_mcp: FastMCP) -> Any:
     log.info("server starting")
@@ -69,25 +87,9 @@ mcp.tool(tools.get_recent)
 mcp.tool(tools.send_to_self)
 
 
-def _route_fastmcp_logs_to_file() -> None:
-    """Redirect FastMCP's own logger to our root file handler.
-
-    FastMCP installs a RichHandler on its ``fastmcp`` logger and sets
-    ``propagate=False``, which would print startup lines to stderr. Strip
-    those handlers and re-enable propagation so the logs reach our
-    RotatingFileHandler instead.
-    """
-    fastmcp_logger = logging.getLogger("fastmcp")
-    for h in list(fastmcp_logger.handlers):
-        fastmcp_logger.removeHandler(h)
-        h.close()
-    fastmcp_logger.propagate = True
-
-
 def main() -> None:
     load_dotenv()
     setup_logging()
-    _route_fastmcp_logs_to_file()
     mcp.run(transport="stdio", show_banner=False)
 
 

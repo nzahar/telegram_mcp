@@ -6,7 +6,7 @@ readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
     "telethon>=1.36",
-    "fastmcp>=2.0",
+    "fastmcp>=3.0,<4",
     "pydantic>=2.0",
     "python-dotenv>=1.0",
 ]

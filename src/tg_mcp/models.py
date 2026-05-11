@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from datetime import datetime
 from typing import Optional, Union
 
@@ -5,6 +7,11 @@ from pydantic import BaseModel, Field
 
 
 ChannelRef = Union[str, int]
+"""Channel reference accepted by every tool: ``@username`` or numeric chat_id.
+
+Defined here so callers and the client module reference the same alias.
+:mod:`tg_mcp.client` re-exports it for backwards-compatibility.
+"""
 
 
 class Message(BaseModel):
