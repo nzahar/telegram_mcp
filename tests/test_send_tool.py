@@ -137,3 +137,49 @@ class TestFloodHandling:
 
         assert result.partial is True
         assert result.message_ids == [10]
+
+
+class TestEdgeCases:
+    async def test_empty_text_sends_nothing_returns_empty_ids(self, fake_client):
+        """Empty text produces no chunks — nothing is sent, ids list is empty."""
+        client = fake_client(FakeClient())
+
+        result = await send_to_self("", chat="me")
+
+        assert result.message_ids == []
+        assert result.partial is False
+        assert result.link is None
+        assert len(client.send_calls) == 0
+
+    async def test_tag_only_no_body(self, fake_client):
+        """tag with empty body: prepend_tag still creates a header; message is sent."""
+        client = fake_client(FakeClient())
+
+        result = await send_to_self("", chat="me", tag="daily")
+
+        # prepend_tag("", "daily") = "\\#daily\n\n" which split_for_telegram returns
+        # as a single non-empty chunk.
+        assert len(result.message_ids) == 1
+        assert result.partial is False
+        sent_text = client.send_calls[0][1]
+        assert "\\#daily" in sent_text
+
+    async def test_tag_with_multiple_leading_hashes(self, fake_client):
+        """Tags like '#####news' strip all leading '#' and produce exactly one '#' in output."""
+        client = fake_client(FakeClient())
+
+        await send_to_self("body", chat="me", tag="#####news")
+
+        sent_text = client.send_calls[0][1]
+        first_line = sent_text.split("\n\n", 1)[0]
+        # Only the normalised #news, escaped as \\#news.
+        assert first_line == "\\#news"
+
+    async def test_no_tag_text_sent_verbatim(self, fake_client):
+        """Without a tag, the body reaches Telegram exactly as provided (caller's MarkdownV2)."""
+        client = fake_client(FakeClient())
+        body = "*bold* _italic_ [link](https://t.me/x)"
+
+        await send_to_self(body, chat="me")
+
+        assert client.send_calls[0][1] == body

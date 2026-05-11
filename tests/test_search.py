@@ -194,3 +194,85 @@ class TestClientInitialisation:
         await tools.search_channels(channels=["@a", "@b"], query="", since="1h")
 
         assert call_count["n"] == 1
+
+
+class TestEdgeCases:
+    async def test_empty_channels_list_returns_empty_result(self, fake_client):
+        """Calling search_channels with an empty list must return a valid empty result."""
+        fake_client(FakeClient())
+
+        result = await search_channels(channels=[], query="", since="1h")
+
+        assert result.items == []
+        assert result.partial is False
+
+    async def test_since_is_required(self, fake_client):
+        """`since` has no default; calling without it must raise TypeError."""
+        fake_client(FakeClient())
+        with pytest.raises(TypeError):
+            await search_channels(channels=["@ch"], query="")  # type: ignore[call-arg]
+
+    async def test_wide_since_window_includes_ancient_messages(self, fake_client):
+        """A deliberately wide window is the documented way to opt out of the cutoff."""
+        entity = FakeEntity(username="ch")
+        ancient = datetime(2000, 1, 1, tzinfo=timezone.utc)
+        msgs = [FakeRawMessage(id=5, text="ancient", date=ancient)]
+        fake_client(FakeClient(channels={"@ch": (entity, msgs)}))
+
+        result = await search_channels(channels=["@ch"], query="", since="100000d")
+
+        assert len(result.items) == 1
+        assert isinstance(result.items[0], Message)
+        assert result.items[0].id == 5
+
+    async def test_unexpected_exception_mid_batch_keeps_earlier_successes(
+        self, fake_client
+    ):
+        """An internal error on channel B does not discard messages from channel A."""
+        e_a = FakeEntity(username="a")
+        e_c = FakeEntity(username="c")
+
+        call_count = {"n": 0}
+
+        def bad_behaviour():
+            raise RuntimeError("disk full")
+
+        client = fake_client(
+            FakeClient(
+                channels={
+                    "@a": (e_a, [FakeRawMessage(id=1, text="a-ok", date=_ago(5))]),
+                    "@b_boom": (FakeEntity(username="b_boom"), bad_behaviour),
+                    "@c": (e_c, [FakeRawMessage(id=2, text="c-ok", date=_ago(5))]),
+                }
+            )
+        )
+
+        result = await search_channels(
+            channels=["@a", "@b_boom", "@c"], query="", since="1h"
+        )
+
+        texts = [item.text if isinstance(item, Message) else item.error for item in result.items]
+        assert "a-ok" in texts
+        assert "internal_error" in texts
+        assert "c-ok" in texts
+        assert result.partial is False  # only FloodLimitExceeded sets partial
+
+    async def test_flood_then_success_on_one_channel_does_not_mark_partial(
+        self, fake_client, fast_flood_retry, flood
+    ):
+        """A channel that recovers after one flood should not set partial=True."""
+        entity = FakeEntity(username="ch")
+        attempts = {"n": 0}
+
+        def behaviour():
+            attempts["n"] += 1
+            if attempts["n"] == 1:
+                return [flood(1)]
+            return [FakeRawMessage(id=99, text="recovered", date=_ago(5))]
+
+        fake_client(FakeClient(channels={"@ch": (entity, behaviour)}))
+
+        result = await search_channels(channels=["@ch"], query="", since="1h")
+
+        assert result.partial is False
+        assert isinstance(result.items[0], Message)

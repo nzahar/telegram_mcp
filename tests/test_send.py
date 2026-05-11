@@ -86,6 +86,55 @@ class TestSplitForTelegram:
         chunks = split_for_telegram(text, limit=50)
         assert all(len(c) <= 50 for c in chunks)
 
+    def test_text_exactly_at_limit_returns_single_chunk(self):
+        """Text whose length == limit must be returned as a single chunk, not split."""
+        text = "a" * TELEGRAM_MESSAGE_LIMIT
+        chunks = split_for_telegram(text)
+        assert chunks == [text]
+
+    def test_text_one_over_limit_splits(self):
+        """Text one character over the limit must produce two chunks."""
+        text = "a" * (TELEGRAM_MESSAGE_LIMIT + 1)
+        chunks = split_for_telegram(text)
+        assert len(chunks) == 2
+        assert all(len(c) <= TELEGRAM_MESSAGE_LIMIT for c in chunks)
+        assert "".join(chunks) == text
+
+    def test_long_sentence_with_only_commas_hard_splits(self):
+        """Sentence with no .!? terminators cannot be split by sentence regex;
+        falls back to hard-split by character."""
+        # A very long "sentence" using only commas — _SENTENCE_SPLIT_RE won't match.
+        text = ("word, " * 200).rstrip(", ")  # ~1199 chars
+        limit = 100
+        chunks = split_for_telegram(text, limit=limit)
+        assert all(len(c) <= limit for c in chunks)
+        # All original characters must be present (order preserved, join reconstructs).
+        assert "".join(chunks) == text
+
+    def test_unicode_boundary_does_not_corrupt_multibyte_chars(self):
+        """Hard split must not cut inside a multi-byte character sequence."""
+        # Each emoji is 1 Unicode code point but may be several bytes; str slicing
+        # by index is safe in Python (it works on code points, not bytes).
+        # We verify the character count is exactly right at boundaries.
+        text = "\U0001f600" * 600  # 600 emoji, each 1 codepoint, 4 UTF-8 bytes
+        limit = 100
+        chunks = split_for_telegram(text, limit=limit)
+        assert all(len(c) <= limit for c in chunks)
+        assert "".join(chunks) == text
+
+    def test_paragraph_separator_preserved_in_reconstruction(self):
+        """Content of each paragraph must be fully represented across chunks."""
+        p1 = "Alpha " * 50  # 300 chars
+        p2 = "Beta " * 50   # 250 chars
+        p3 = "Gamma " * 50  # 300 chars
+        text = f"{p1}\n\n{p2}\n\n{p3}"
+        chunks = split_for_telegram(text, limit=400)
+        joined = "\n\n".join(chunks) if len(chunks) > 1 else chunks[0]
+        # All three content blocks must be somewhere in the output.
+        assert p1.strip() in "".join(chunks)
+        assert p2.strip() in "".join(chunks)
+        assert p3.strip() in "".join(chunks)
+
 
 class TestPrependTag:
     def test_tag_without_hash(self):

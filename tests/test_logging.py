@@ -90,3 +90,26 @@ def test_setup_logging_invalid_level_falls_back_to_info(log_dir, monkeypatch):
     monkeypatch.setenv("TG_LOG_LEVEL", "BOGUS")
     setup_logging(path=str(log_dir))
     assert logging.getLogger().level == logging.INFO
+
+
+def test_setup_logging_rotation_parameters_applied(log_dir):
+    """RotatingFileHandler must be configured with the documented maxBytes and backupCount."""
+    from logging.handlers import RotatingFileHandler
+    from tg_mcp.logging_setup import BACKUP_COUNT, MAX_BYTES
+
+    setup_logging(path=str(log_dir))
+    root = logging.getLogger()
+    rotating_handlers = [h for h in root.handlers if isinstance(h, RotatingFileHandler)]
+    assert len(rotating_handlers) == 1, "expected exactly one RotatingFileHandler"
+    h = rotating_handlers[0]
+    assert h.maxBytes == MAX_BYTES
+    assert h.backupCount == BACKUP_COUNT
+
+
+def test_setup_logging_explicit_level_overrides_env(tmp_path, monkeypatch):
+    """Explicit level= arg must win over TG_LOG_LEVEL env var."""
+    monkeypatch.setenv("TG_LOG_LEVEL", "ERROR")
+    monkeypatch.delenv("TG_LOG_PATH", raising=False)
+    log_path = tmp_path / "override.log"
+    setup_logging(path=str(log_path), level="DEBUG")
+    assert logging.getLogger().level == logging.DEBUG

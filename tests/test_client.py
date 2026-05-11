@@ -86,6 +86,47 @@ class TestWithFloodRetry:
         with pytest.raises(RuntimeError, match="boom"):
             await with_flood_retry(factory, log)
 
+    async def test_non_flood_on_retry_propagates(self, monkeypatch, log):
+        """First call raises FloodWait; retry raises a non-Flood error — must propagate."""
+        async def fake_sleep(_):
+            return None
+
+        monkeypatch.setattr("tg_mcp.client.asyncio.sleep", fake_sleep)
+
+        calls = []
+
+        async def factory():
+            calls.append(len(calls) + 1)
+            if len(calls) == 1:
+                raise _flood(2)
+            raise ValueError("network error on retry")
+
+        with pytest.raises(ValueError, match="network error on retry"):
+            await with_flood_retry(factory, log)
+
+        assert len(calls) == 2
+
+    async def test_flood_wait_zero_seconds_sleeps_zero(self, monkeypatch, log):
+        """FloodWaitError with seconds=0 must still invoke sleep(0)."""
+        sleeps = []
+
+        async def fake_sleep(seconds):
+            sleeps.append(seconds)
+
+        monkeypatch.setattr("tg_mcp.client.asyncio.sleep", fake_sleep)
+
+        calls = []
+
+        async def factory():
+            calls.append(1)
+            if len(calls) == 1:
+                raise _flood(0)
+            return "ok-zero"
+
+        result = await with_flood_retry(factory, log)
+        assert result == "ok-zero"
+        assert sleeps == [0]
+
 
 class _FakeClient:
     def __init__(self, *, raises=None, returns=None):

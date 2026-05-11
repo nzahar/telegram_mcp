@@ -88,11 +88,21 @@ class FakeClient:
         raise ValueError(f"unknown entity: {ref!r}")
 
     def iter_messages(self, entity, limit=None, search=None, offset_date=None):
+        if offset_date is not None:
+            # Production tools currently filter by date in-loop, not via
+            # offset_date. If that changes, the fake should be updated to
+            # honour the kwarg rather than silently ignore it.
+            raise NotImplementedError(
+                "FakeClient.iter_messages does not implement offset_date; "
+                "production tools filter via raw.date < since_dt instead."
+            )
         self.iter_calls.append((entity, limit, search))
         for ref, (ent, behaviour) in self.channels.items():
             if ent is entity:
                 items = behaviour() if callable(behaviour) else behaviour
-                return _AsyncMessagesIter(items)
+                # Copy so a list-form behaviour isn't drained across calls
+                # (callable behaviour already returns a fresh list each time).
+                return _AsyncMessagesIter(list(items))
         return _AsyncMessagesIter([])
 
     async def send_message(self, chat, text, parse_mode=None):
