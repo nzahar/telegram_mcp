@@ -46,6 +46,24 @@ class ErrorEntry(BaseModel):
     )
 
 
+class ReadResult(BaseModel):
+    """Result of a read tool (``search_channels`` or ``get_recent``)."""
+
+    items: list[Union[Message, ErrorEntry]] = Field(
+        description=(
+            "Mixed list of successful messages and per-channel errors. "
+            "Order: channels are processed in the order passed in."
+        )
+    )
+    partial: bool = Field(
+        default=False,
+        description=(
+            "True when at least one channel was abandoned after a second "
+            "FloodWaitError. Items from that channel are absent or incomplete."
+        ),
+    )
+
+
 class SendResult(BaseModel):
     """Result of send_to_self."""
 
