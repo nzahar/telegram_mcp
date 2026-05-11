@@ -161,3 +161,35 @@ class TestMiddlewareTextNotInLogFile:
             server_logger.handlers = original_handlers
             server_logger.propagate = original_propagate
             handler.close()
+
+
+class TestFastMCPLoggerStrip:
+    """Importing ``tg_mcp.server`` strips FastMCP's RichHandler at module-import time.
+
+    Regression guard for ADR-0002 layer 2: a FastMCP version bump that moves
+    its handler attachment past our strip point would silently re-enable
+    stderr output during a real run. The two stdio subprocess tests catch the
+    end-to-end behaviour; this test catches the mechanism so a failure points
+    directly at the import-ordering assumption.
+    """
+
+    def test_fastmcp_logger_has_no_handlers_after_server_import(self):
+        # Importing tg_mcp.server is already done by other tests in this file,
+        # so the strip has already run. Re-import is a no-op (module cache),
+        # but we keep this assertion robust by importing explicitly.
+        import tg_mcp.server  # noqa: F401
+
+        fastmcp_logger = logging.getLogger("fastmcp")
+        assert fastmcp_logger.handlers == [], (
+            "fastmcp logger still has handlers after tg_mcp.server import — "
+            f"_route_fastmcp_logs_to_file did not strip them: {fastmcp_logger.handlers!r}"
+        )
+
+    def test_fastmcp_logger_propagates_after_server_import(self):
+        import tg_mcp.server  # noqa: F401
+
+        fastmcp_logger = logging.getLogger("fastmcp")
+        assert fastmcp_logger.propagate is True, (
+            "fastmcp logger has propagate=False after tg_mcp.server import — "
+            "FastMCP logs won't reach our root file handler"
+        )

@@ -52,6 +52,25 @@ class TestSingleChunk:
         assert result.message_ids == [555]
         assert result.link == "https://t.me/public_chan/555"
 
+    async def test_mixed_case_username_link_is_lowercased(self, fake_client):
+        """_send_link must lowercase the @username segment so the link matches
+        what Telethon's resolve path returns (entity.username is always lower)."""
+        client = fake_client(
+            FakeClient(send_behaviour=[FakeSentMessage(id=42)])
+        )
+
+        result = await send_to_self("hi", chat="@MixedCaseChan")
+
+        assert result.link == "https://t.me/mixedcasechan/42"
+
+    async def test_at_only_username_produces_no_link(self, fake_client):
+        """A bare '@' with nothing after it must not produce a link."""
+        client = fake_client(FakeClient())
+
+        result = await send_to_self("hi", chat="@")
+
+        assert result.link is None
+
     async def test_numeric_chat_id_returns_no_link(self, fake_client):
         client = fake_client(FakeClient())
 

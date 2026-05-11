@@ -9,10 +9,13 @@ import pytest
 
 from tg_mcp.formatting import (
     TELEGRAM_MESSAGE_LIMIT,
+    _hard_split,
+    _split_keeping_separators,
     escape_md_v2,
     prepend_tag,
     split_for_telegram,
 )
+import re
 
 
 class TestEscapeMdV2:
@@ -134,6 +137,102 @@ class TestSplitForTelegram:
         assert p1.strip() in "".join(chunks)
         assert p2.strip() in "".join(chunks)
         assert p3.strip() in "".join(chunks)
+
+
+class TestHardSplitEscapePairDefense:
+    """_hard_split must never leave a dangling backslash at a chunk boundary."""
+
+    def test_boundary_on_single_trailing_backslash_shifts_to_next_chunk(self):
+        # 4-char limit: "abc\" splits naively as ["abc\", "x"]
+        # The trailing odd backslash must move to the next chunk.
+        text = r"abc\x"  # raw string: a b c \ x  (5 chars)
+        chunks = _hard_split(text, limit=4)
+        assert all(len(c) <= 4 for c in chunks)
+        # Chunk boundary must not end on a lone backslash.
+        assert not chunks[0].endswith("\\") or chunks[0].endswith("\\\\"), (
+            f"dangling backslash in chunk 0: {chunks[0]!r}"
+        )
+        # Reconstruction is lossless.
+        assert "".join(chunks) == text
+
+    def test_boundary_on_even_backslash_run_not_shifted(self):
+        # Even run of backslashes at boundary is fine — they are escape pairs.
+        # "aa\\" fits in 4 chars; second chunk is "bb".
+        text = "aa\\\\bb"  # a a \ \ b b (6 chars)
+        chunks = _hard_split(text, limit=4)
+        assert "".join(chunks) == text
+        # First chunk should not have been trimmed.
+        assert chunks[0] == "aa\\\\"
+
+    def test_backslash_at_limit_boundary_reconstruction_is_lossless(self):
+        # Construct a string where the naive split falls exactly on a lone backslash.
+        # limit=5: "aaaa\" (5 chars) -> shifts \ to next chunk.
+        text = "aaaa\\" + "bbbb"  # 9 chars
+        chunks = _hard_split(text, limit=5)
+        assert "".join(chunks) == text
+        for c in chunks:
+            assert len(c) <= 5
+
+    def test_no_backslashes_passes_through_unchanged(self):
+        text = "abcdefgh"
+        chunks = _hard_split(text, limit=4)
+        assert chunks == ["abcd", "efgh"]
+
+    def test_all_backslashes_splits_in_even_pairs(self):
+        # 8 backslashes at limit=4: splits as ["\\\\", "\\\\"] — both even, no shift needed.
+        text = "\\" * 8
+        chunks = _hard_split(text, limit=4)
+        assert "".join(chunks) == text
+        assert all(len(c) <= 4 for c in chunks)
+
+
+class TestSentenceSplitterWhitespacePreservation:
+    """split_for_telegram's sentence-tier path must preserve original whitespace."""
+
+    def test_newline_between_sentences_not_collapsed_to_space(self):
+        # Build a long paragraph with a newline between two sentences.
+        # The paragraph exceeds the limit; sentence splitting is forced.
+        # The newline must survive in the output — it must not become " ".
+        sentence_a = "A" * 60 + ". "  # 62 chars, ends at sentence boundary
+        sentence_b = "\n" + "B" * 60 + "."  # 62 chars, starts with newline
+        text = sentence_a + sentence_b  # 124 chars total
+        chunks = split_for_telegram(text, limit=70)
+        # Reconstruction must preserve the newline.
+        joined = "".join(chunks)
+        assert "\n" in joined, (
+            "newline between sentences was collapsed; "
+            f"chunks={chunks!r}"
+        )
+
+    def test_multiple_spaces_between_sentences_are_preserved(self):
+        # Two spaces after a period must survive through sentence-level splitting.
+        sentence_a = "X" * 60 + ".  "  # two trailing spaces
+        sentence_b = "Y" * 60 + "."
+        text = sentence_a + sentence_b
+        chunks = split_for_telegram(text, limit=70)
+        joined = "".join(chunks)
+        # The two-space gap should appear somewhere in the reconstruction.
+        assert ".  " in joined or joined == text, (
+            f"double space collapsed; joined={joined!r}"
+        )
+
+    def test_split_keeping_separators_reconstructs_exactly(self):
+        # Unit test for _split_keeping_separators directly:
+        # splitting then joining with "" must reproduce the original string.
+        text = "Hello world. Foo bar! Baz qux? Last."
+        boundary = re.compile(r"(?<=[.!?])\s+")
+        parts = _split_keeping_separators(text, boundary)
+        assert "".join(parts) == text
+
+    def test_split_keeping_separators_newline_in_separator(self):
+        # Ensure that newline separators (not just spaces) are included in the
+        # preceding segment so concatenation with "" is lossless.
+        text = "Sentence one.\nSentence two."
+        boundary = re.compile(r"(?<=[.!?])\s+")
+        parts = _split_keeping_separators(text, boundary)
+        assert "".join(parts) == text
+        # The first part should include the trailing "\n".
+        assert parts[0].endswith("\n"), f"separator not retained: {parts[0]!r}"
 
 
 class TestPrependTag:
