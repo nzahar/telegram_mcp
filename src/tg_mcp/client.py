@@ -64,6 +64,8 @@ class FloodLimitExceeded(Exception):
         self.seconds = seconds
 
 
+_log = logging.getLogger("tg_mcp.client")
+
 _client: Optional[TelegramClient] = None
 _client_lock = asyncio.Lock()
 
@@ -92,10 +94,12 @@ async def get_client() -> TelegramClient:
         if prev is not None:
             try:
                 await prev.disconnect()
-            except Exception:
-                # The old singleton is already dead; don't let cleanup hide
-                # the real reason we're reconnecting.
-                pass
+            except (ConnectionError, OSError) as e:
+                # Stale-client cleanup hit a network/socket error; log but
+                # don't propagate — we're about to replace the client anyway.
+                # A narrow catch keeps programmer errors (AttributeError,
+                # TypeError, …) visible.
+                _log.warning("stale client disconnect failed: %r", e)
 
         try:
             api_id = int(os.environ["TG_API_ID"])

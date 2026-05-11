@@ -106,7 +106,7 @@ Replace `/absolute/path/to/telegram_mcp` with the repo path, and fill in your cr
 
 All tools return pydantic models that the host serialises as JSON.
 
-### `search_channels(channels, query, since, limit_per_channel=50) -> ReadResult`
+### `search_channels(channels, since, query="", limit_per_channel=50) -> ReadResult`
 
 Search for matching messages across multiple channels in a single call.
 

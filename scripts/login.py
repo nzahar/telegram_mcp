@@ -27,6 +27,7 @@ import argparse
 import os
 import stat
 import sys
+import tempfile
 from pathlib import Path
 
 from telethon import TelegramClient
@@ -51,19 +52,35 @@ def _resolve_api_hash() -> str:
 
 
 def _write_session_file(path: Path, session_string: str) -> None:
-    # Create with 0600 atomically — write through an exclusive-create handle
-    # before the secret reaches the filesystem at any wider permission.
-    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    """Write ``session_string`` to ``path`` at mode 0600 without ever exposing
+    the secret on disk at a wider permission.
+
+    Implementation: write to a sibling tempfile created via ``mkstemp`` (which
+    always creates a fresh inode at 0600 regardless of umask, before any byte
+    is written), then ``os.replace`` onto the target. ``os.open(path, ...,
+    0o600)`` alone is **not** atomic when ``path`` already exists, because
+    ``O_CREAT`` ignores the mode arg on an existing inode — the write would
+    land on whatever pre-existing mode the file had.
+    """
+    parent = path.parent or Path(".")
+    fd, tmp_name = tempfile.mkstemp(prefix=".tg-session-", dir=str(parent))
+    tmp_path = Path(tmp_name)
     try:
-        os.write(fd, session_string.encode("utf-8"))
-        os.write(fd, b"\n")
-    finally:
-        os.close(fd)
-    # Defensive: re-stat and tighten if umask widened the mode (some
-    # filesystems / sandboxes ignore the mode arg to open()).
-    current = stat.S_IMODE(path.stat().st_mode)
-    if current & 0o077:
-        path.chmod(0o600)
+        try:
+            os.write(fd, session_string.encode("utf-8"))
+            os.write(fd, b"\n")
+        finally:
+            os.close(fd)
+        # mkstemp creates at 0600; double-check in case the platform widened.
+        if stat.S_IMODE(tmp_path.stat().st_mode) & 0o077:
+            tmp_path.chmod(0o600)
+        os.replace(tmp_path, path)
+    except BaseException:
+        # Don't leave the tempfile behind on error — it has 0600 but the user
+        # didn't ask for it at that name.
+        if tmp_path.exists():
+            tmp_path.unlink()
+        raise
 
 
 def main() -> None:

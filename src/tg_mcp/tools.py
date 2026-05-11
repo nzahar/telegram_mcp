@@ -27,8 +27,13 @@ log = logging.getLogger("tg_mcp.tools")
 
 
 def _build_message_link(entity, msg_id: int) -> Optional[str]:
+    # Lowercase for symmetry with _send_link and defence against a future
+    # Telethon (or test fake) that returns a mixed-case username; Telegram
+    # usernames are case-insensitive at the URL layer either way.
     username = getattr(entity, "username", None)
-    return f"https://t.me/{username}/{msg_id}" if username else None
+    if not username:
+        return None
+    return f"https://t.me/{username.lower()}/{msg_id}"
 
 
 def _to_message(raw, channel_ref: ChannelRef, entity) -> Message:
