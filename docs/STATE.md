@@ -4,6 +4,8 @@ _Last updated: 2026-05-11 15:15_
 
 ## Current
 
+> ✅ **Merged 2026-05-11:** `e9775f1` — feat: Telegram MCP server v1 (read + send-to-self over stdio) (#6)
+
 **In progress / awaiting user action:** push `claude/check-project-status-yc8Se`, open a PR, squash-merge into `main` via `/merge-pr`. Claude does not push without explicit user command — the branch is otherwise complete.
 **Recently shipped:** v1 implementation across 15 commits on `claude/check-project-status-yc8Se`. Three pre-merge triad passes (`test-writer`, `code-reviewer`, `document-agent`) all returned APPROVED on the current state. 138 tests passing + 1 deselected integration. Latest commit: `b1d99e9` (test+docs: pass-3 verification additions — adds five unit cases on `_build_message_link` after re-reading the file).
 **Blocked / waiting on:** nothing.
@@ -72,15 +74,3 @@ _Last updated: 2026-05-11 15:15_
 
 - **Just decided (locked with user).** Stack: FastMCP (decorator API) + uv + Python 3.11+ + Telethon + pydantic v2. Decomposition: 8 sequential slices (skeleton → models/formatting → logging → Telethon wrapper → tools → server → login script → README). Slices have linear dependencies; no parallel sub-agent dispatch planned.
 - **plan-reviewer outcome.** Engineering mode, APPROVED — 0 blockers, 3 warnings. All 4 fixes applied to the plan before implementation start.
-- **Hard invariants (from `CLAUDE.md`) — must hold in every slice.**
-  - No channel whitelist in code, env, or persistent state — channels passed per-call only.
-  - No stdout writes from server code — stdio is the MCP transport. All logs to rotating file (default `~/.local/state/tg-mcp/server.log`). Slice 6 includes an automated stdout-silence test (`tests/test_server_stdio.py`).
-  - No destructive Telegram operations — read + send-to-self only.
-  - Server never queries channels not in the current call's `channels`/`channel` arg.
-  - Server never sends to chats other than the explicit `chat` arg of `send_to_self` (default `"me"`).
-- **Open risks carried from the plan (not yet resolved in code).**
-  - MarkdownV2 caller contract for `send_to_self`: option (a) locked — caller passes already-valid MarkdownV2, server only escapes the tag. README must document this so prompts do not double-escape. Switching to option (b) is a one-line change if practice proves option (a) wrong.
-  - `link` field semantics for non-public chats: public channel → `https://t.me/<username>/<id>`; `chat="me"` → `None`; numeric `chat_id` → `None` for v1 (no robust public form). Documented in plan; will be re-stated in `Message`/`SendResult` model docstrings.
-- **No ADR or CODEMAP exists yet.** Both will be created by `document-agent` in the pre-merge triad once implementation lands. First ADR target: the "no whitelist in server" invariant.
-
-Project bootstrapped. Repo contains only `CLAUDE.md` and the approved plan at `docs/plans/setup-project-workflow-hrLJK.md`.
