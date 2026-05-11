@@ -5,13 +5,39 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 
 from tg_mcp.models import ErrorEntry, Message
-from tg_mcp.tools import get_recent
+from tg_mcp.tools import _build_message_link, get_recent
 
 from tests.conftest import FakeClient, FakeEntity, FakeRawMessage
 
 
 def _ago(seconds: int) -> datetime:
     return datetime.now(timezone.utc) - timedelta(seconds=seconds)
+
+
+class TestBuildMessageLink:
+    """Unit tests for _build_message_link — isolated from FakeClient."""
+
+    def test_lowercase_already_lower(self):
+        entity = FakeEntity(username="durov")
+        assert _build_message_link(entity, 42) == "https://t.me/durov/42"
+
+    def test_mixed_case_username_is_lowercased(self):
+        """Telethon may return the username in its original mixed case; the link
+        must be lowercase for symmetry with _send_link and Telegram URL conventions."""
+        entity = FakeEntity(username="DuRoV")
+        assert _build_message_link(entity, 7) == "https://t.me/durov/7"
+
+    def test_none_username_returns_none(self):
+        assert _build_message_link(FakeEntity(username=None), 1) is None
+
+    def test_empty_username_returns_none(self):
+        assert _build_message_link(FakeEntity(username=""), 1) is None
+
+    def test_no_username_attr_returns_none(self):
+        class _EntityWithout:
+            pass
+
+        assert _build_message_link(_EntityWithout(), 1) is None
 
 
 class TestGetRecent:

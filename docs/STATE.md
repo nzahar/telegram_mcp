@@ -1,12 +1,12 @@
 # STATE — telegram_mcp
 
-_Last updated: 2026-05-11 14:58_
+_Last updated: 2026-05-11 15:10_
 
 ## Current
 
 **Active branch:** `claude/check-project-status-yc8Se`.
-**In progress:** Second-pass pre-push verification triad. Docs, ADRs, and STATE re-verified against live code; no factual drift in the codemap or ADRs. Test count corrected here (was logged as 109 + 1; actual is 111 passed + 1 deselected). Branch is ready to push and merge.
-**Recently shipped:** Pre-merge triad complete. `b595297` (`fix:`) applied all P1 and P2 findings from `code-reviewer` (required `since`, leak-free reconnect in `get_client`, whitespace-preserving sentence splitter, MarkdownV2 escape-pair guard in `_hard_split`, lowercase `@username` in `_send_link`, FastMCP silencer hoisted to module-import time, `fastmcp>=3.0,<4` pin, `--out` flag on `scripts/login.py`). `9c81b09` (`test:`) added new tests (middleware unit tests, stdio full-protocol exchange, edge cases for search/send/formatting/client/logging). `1e0153e` (`docs:`) landed the post-triad CODEMAP/ADR refresh. 111 tests pass + 1 deselected (was 82 + 1 before the triad).
+**In progress:** Third-pass pre-push verification triad in flight. Second-pass triad findings landed in `de30c0f` (`fix:`), `6a3344b` (`test:`), `5e9a097` (`docs:`); third pass re-verifies the result. Test count corrected here (actual is 133 passed + 1 deselected). Branch is ready to push and merge once the third pass finishes.
+**Recently shipped:** Second-pass triad addressed: `de30c0f` (`fix:`) made `scripts/login.py::_write_session_file` atomic via `mkstemp + os.replace`, narrowed `client.get_client` stale-cleanup catch to `(ConnectionError, OSError)` with `_log.warning(...)`, lowercased `_build_message_link` for symmetry with `_send_link`, fixed `search_channels` parameter order in README. `6a3344b` (`test:`) added 24 tests (109 → 133) covering the new TOCTOU/atomicity guards, the narrow-catch contract, the bare-`@` no-link case, sentence-splitter whitespace preservation, hard-split escape-pair defence, and `_route_fastmcp_logs_to_file` via the new `TestFastMCPLoggerStrip`. `5e9a097` (`docs:`) added `docs/SETUP.md` (operator setup memo) and fixed an ADR-0004 stale test reference. Earlier on the same branch: first-pass triad (`b595297`, `9c81b09`, `1e0153e`).
 **Blocked / waiting on:** nothing.
 **Next up:** push `claude/check-project-status-yc8Se`, open a PR, squash-merge into `main` via `/merge-pr`.
 

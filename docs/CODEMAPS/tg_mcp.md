@@ -66,13 +66,13 @@ Entrypoint: `python -m tg_mcp.server` calls `main()` → `load_dotenv()` → `se
 | `tests/conftest.py` | `FakeClient`, `FakeEntity`, `FakeRawMessage`, `FakeSentMessage`, `fake_client`, `fast_flood_retry`, `flood` fixtures |
 | `tests/test_send.py` | `formatting`: escape, split-by-paragraph/sentence/char, `prepend_tag` |
 | `tests/test_logging.py` | `logging_setup.setup_logging`: file write, stdout/stderr silence, env-var routing |
-| `tests/test_client.py` | `client.get_client` singleton, `shutdown`, `resolve_channel`, `with_flood_retry` |
+| `tests/test_client.py` | `client.get_client` singleton, `shutdown`, `resolve_channel`, `with_flood_retry`, `TestGetClientStaleReconnect` (network-disconnect error swallowed; programmer error propagates — documents the narrow `(ConnectionError, OSError)` catch in stale-client cleanup) |
 | `tests/test_since_parsing.py` | `client.parse_since` happy + error paths |
 | `tests/test_search.py` | `tools.search_channels` (happy path, ErrorEntry, flood retry, partial) |
 | `tests/test_get_recent.py` | `tools.get_recent` |
 | `tests/test_send_tool.py` | `tools.send_to_self` (split → multi-send, partial on flood, tag, link rules) |
 | `tests/test_server_stdio.py` | Regression guards: (1) `test_stdout_is_silent_on_immediate_eof` — real `python -m tg_mcp.server` with closed stdin produces 0 bytes on stdout/stderr; (2) `test_full_protocol_exchange_keeps_stdio_clean` — drives a real initialize + tools/list + failing tools/call against the subprocess, asserts every stdout line parses as JSON-RPC 2.0 and stderr stays empty (exercises `_CallLoggingMiddleware.on_call_tool` end-to-end including its exception branch) |
-| `tests/test_server_middleware.py` | `_CallLoggingMiddleware` unit tests: tool name logged, arg keys logged but values never reach the log file (privacy invariant for `send_to_self.text` — verified with a canary on a real `RotatingFileHandler`), keys sorted deterministically, elapsed_ms on success, exception logged as `tool_error` and re-raised, `arguments=None` handled |
+| `tests/test_server_middleware.py` | `_CallLoggingMiddleware` unit tests: tool name logged, arg keys logged but values never reach the log file (privacy invariant for `send_to_self.text` — verified with a canary on a real `RotatingFileHandler`), keys sorted deterministically, elapsed_ms on success, exception logged as `tool_error` and re-raised, `arguments=None` handled. `TestFastMCPLoggerStrip`: import-time `_route_fastmcp_logs_to_file` clears `logging.getLogger("fastmcp").handlers` and sets `propagate=True` (regression guard for a future FastMCP that attaches its handler after our strip point) |
 | `tests/test_login_script.py` | `scripts/login.py` argparse / env handling |
 | `tests/test_integration.py` | `pytestmark = pytest.mark.integration`; deselected by `addopts = "-m 'not integration'"` |
 
